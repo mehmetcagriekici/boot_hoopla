@@ -1,26 +1,22 @@
 import re
+from nltk.stem import PorterStemmer
 
-def print_movies(movies, query):
-    matches = []
-    # get matches
-    for i in range(len(movies)):
-        if find_match(movies[i]["title"], query):
-            matches.append(movies[i])
-    # sort matches by id
-    sorted(matches, key=lambda movie: movie["id"])
-    # print matches
-    for i in range(len(matches[:4])):
-        title = matches[i]["title"]
-        print(f"{i + 1}. {title}")
+stemmer = PorterStemmer()
 
-# wide search
-def find_match(title, query):
-    for tq in tokenize(query):
-        for tt in tokenize(title):
-            if tq in tt:
-                return True
-    return False
+def print_movies(query, indexes, movies):
+    doc_ids = indexes.get_documents(query)
+    for i in doc_ids:
+        for m in movies:
+           if m["id"] == i:
+               title = m["title"]
+               print(title)
+        
 
 # create token strings
 def tokenize(string):
-    return list(filter(lambda w: w != "", re.sub(r'[^\w\s]+', "", string).lower().split()))
+    return list(map(lambda w: stemmer.stem(w), filter(lambda w: w not in read_stop_words(), re.sub(r'[^\w\s]+', "", string).lower().split())))
+
+# read stop words
+def read_stop_words():
+    f = open("./data/stopwords.txt")
+    return f.read().splitlines()
