@@ -1,4 +1,5 @@
 import re
+import math
 from nltk.stem import PorterStemmer
 
 stemmer = PorterStemmer()
@@ -20,3 +21,11 @@ def tokenize(string):
 def read_stop_words():
     f = open("./data/stopwords.txt")
     return f.read().splitlines()
+
+# calc idf score
+def calc_idf(total_doc_count, term_match_doc_count):
+    return math.log((total_doc_count + 1) / (term_match_doc_count + 1))
+
+# tfidf score
+def calc_tfidf(tf, idf):
+    return tf * idf
