@@ -7,7 +7,7 @@ from constants.constants import BM25_K1, BM25_B
 import itertools
 
 class InvertedIndex:
-    def __init__(self) -> None:
+    def __init__(self):
         # a dictionary mapping tokens (strings) to sets of document IDs (integers).
         self.index            = dict()
         # a dictionary mapping document IDs to their full document objects.
