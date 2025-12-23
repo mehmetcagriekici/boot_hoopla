@@ -17,7 +17,7 @@ class InvertedIndex:
         # lengths of the documents
         self.doc_lengths = dict()
         
-        self.__index_path       = Path("cache/index.pkl")
+        self.index_path         = Path("cache/index.pkl")
         self.__docmap_path      = Path("cache/docmap.pkl")
         self.__tf_path          = Path("cache/term_frequencies.pkl")
         self.__doc_lengths_path = Path("cache/doc_lengths.pkl")
@@ -64,7 +64,7 @@ class InvertedIndex:
     # save the index and docmap attributes to disk using the pickle module's dump function.
     def save(self):
         Path("./cache").mkdir(exist_ok=True)
-        with self.__index_path.open(mode="wb") as fi:
+        with self.index_path.open(mode="wb") as fi:
             pickle.dump(self.index, fi)
         with self.__docmap_path.open(mode="wb") as fdm:
             pickle.dump(self.docmap, fdm)
@@ -76,7 +76,7 @@ class InvertedIndex:
     # load the index and docmap from disk
     def load(self):
         try:
-            with self.__index_path.open(mode="rb") as fi:
+            with self.index_path.open(mode="rb") as fi:
                 self.index = pickle.load(fi)
             with self.__docmap_path.open(mode="rb") as fdm:
                 self.docmap = pickle.load(fdm)
