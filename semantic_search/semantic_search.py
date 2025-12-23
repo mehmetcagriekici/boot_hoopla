@@ -73,6 +73,7 @@ class ChunkedSemanticSearch(SemanticSearch):
             desc = doc["description"]
             if desc == "":
                 continue
+            
             chunks = semantic_chunk(desc, 4, 1)
             for j in range(len(chunks)):
                 all_chunks.append(chunks[j])
@@ -82,6 +83,7 @@ class ChunkedSemanticSearch(SemanticSearch):
                     "total_chunks": len(chunks),
                 }
                 chunk_metadata.append(metadata)
+                
         self.chunk_embeddings = self.model.encode(all_chunks)
         self.chunk_metadata = chunk_metadata
         Path("./cache").mkdir(exist_ok=True)
@@ -202,6 +204,7 @@ def search_chunked(docs, query, limit):
     css = ChunkedSemanticSearch()
     embeddings = css.load_or_create_chunk_embeddings(docs)
     results = css.search_chunks(query, limit)
+
     for i in range(len(results)):
         res = results[i]
         title = res["title"]
@@ -222,7 +225,15 @@ def chunk(text, size, overlap):
         print(f"{i + 1}. {chunks[i]}")
 
 def semantic_chunk(text, size, overlap):
-    return chunk_base(re.split(r"(?<=[.!?])\s+", text), size, overlap)
+    copy_text = text.strip()
+    if copy_text == "":
+        return list()
+
+    sentences = re.split(r"(?<=[.!?])\s+", copy_text)
+    if len(sentences) == 1 and not sentences[0].endswith((".", "!", "?")):
+        sentences = [text]
+        
+    return chunk_base(sentences, size, overlap)
 
 def chunk_base(words, size, overlap):
     pivot = 0
@@ -240,7 +251,13 @@ def chunk_base(words, size, overlap):
             if right_index - left_index > size:
                 right_index = left_index + size
                 
-            chunks.append(" ".join(words[left_index:right_index]))
+            chunk = " ".join(words[left_index:right_index])
+            chunk = chunk.strip()
+
+            if chunk == "":
+                continue
+            
+            chunks.append(chunk)
             
             left_index = right_index
             right_index += size
