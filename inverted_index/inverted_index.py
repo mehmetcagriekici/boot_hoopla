@@ -127,7 +127,8 @@ class InvertedIndex:
         tokens = tokenize(query)
         scores = defaultdict(float)
         for t in tokens:
-            for doc_id in self.index[t]:
-                scores[doc_id] += self.bm25(doc_id, t)
+            if t in self.index:
+                for doc_id in self.index[t]:
+                    scores[doc_id] += self.bm25(doc_id, t)
         
         return OrderedDict(itertools.islice(sorted(scores.items(), key=lambda kv: kv[1], reverse=True), limit))
