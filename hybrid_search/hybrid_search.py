@@ -4,6 +4,11 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 import os
+import time
+import json
+import re
+
+from sentence_transformers import CrossEncoder
 
 from inverted_index.inverted_index import InvertedIndex
 from semantic_search.semantic_search import ChunkedSemanticSearch
@@ -80,7 +85,8 @@ class HybridSearch:
                 rrf_score += self.rrf_score(bm25_ranks[doc_id], k)
                 bm25_rank = bm25_ranks[doc_id]
                 
-            rrf_scores.append(dict(title=res["title"],
+            rrf_scores.append(dict(doc_id=doc_id,
+                                   title=res["title"],
                                    desc=res["document"],
                                    bm25_rank=bm25_rank,
                                    semantic_rank=i+1,
@@ -134,7 +140,7 @@ def weighted_search(docs, query, alpha, limit):
         print(f"BM25: {bm25:.4f}, Semantic: {ss:.4f}")
         print(desc)
 
-def rrf_search(docs, query, k, limit, enhance):
+def rrf_search(docs, query, k, limit, enhance, rerank_method):
     search_query = query
     if enhance is not None:
         match enhance:
@@ -191,7 +197,76 @@ def rrf_search(docs, query, k, limit, enhance):
                 print("invalid enhance option")
                     
     hs = HybridSearch(docs)
-    scores = hs.rrf_search(search_query, k, limit)
+    
+    rrf_limit = limit
+    if rerank_method == "individual" or rerank_method == "batch" or rerank_method == "cross_encoder":
+        rrf_limit *= 5
+        
+    scores = hs.rrf_search(search_query, k, rrf_limit)
+
+    if rerank_method is not None:
+        match rerank_method:
+            case "individual":
+                print(f"Reranking top {limit} results using individual method...")
+                for score in scores:
+                    title = score["title"]
+                    desc = score["desc"]
+                    prompt = f"""Rate how well this movie matches the search query.
+
+                    Query: "{search_query}"
+                    Movie: {title} - {desc}
+
+                    Consider:
+                    - Direct relevance to query
+                    - User intent (what they're looking for)
+                    - Content appropriateness
+
+                    Rate 0-10 (10 = perfect match).
+                    Give me ONLY the number in your response, no other text or explanation.
+
+                    Score:"""
+                    score["rerank_score"] = gemini(prompt)
+                    time.sleep(3)
+                scores = sorted(scores, key=lambda sc: sc["rerank_score"], reverse=True)[:limit]
+                print(f"Reciprocal Rank Fusion Results for '{search_query}' (k={k}):")
+            case "batch":
+                print(f"Reranking top {limit} results using batch method...")
+                mvs = " ".join(map(lambda sc: f"id: {sc['doc_id']} title: {sc['title']}  description: {sc['desc']}", scores))
+                
+                prompt = f"""Rank these movies by relevance to the search query using title and description.
+
+                Query: "{search_query}"
+
+                Movies:
+                {mvs}
+
+                Return ONLY the IDs in order of relevance (best match first).
+                Return a valid JSON list, nothing else.
+                Do NOT wrap the list in backticks or a code block.
+
+                [75, 12, 34, 2, 1]
+                """
+                response = gemini(prompt)
+                doc_ids = re.sub(r"[^0-9]", " ", response).split()
+                for score in scores:
+                    for i in range(len(doc_ids)):
+                        if score["doc_id"] == doc_ids[i]:
+                            score["rerank_rank"] = i + 1
+                    if "rerank_rank" not in score:
+                        score["rerank_rank"] = len(doc_ids)
+                    
+                scores = sorted(scores, key=lambda sc: sc["rerank_rank"])[:limit]
+                print(f"Reciprocal Rank Fusion Results for '{search_query}' (k={k}):")
+            case "cross_encoder":
+                pairs = list(map(lambda sc: [search_query, f"{sc['title']} - {sc['desc']}"], scores))
+                cross_encoder = CrossEncoder("cross-encoder/ms-marco-TinyBERT-L2-v2")
+                cross_scores = cross_encoder.predict(pairs)
+                for i in range(len(scores)):
+                    scores[i]["cross_encoder_score"] = cross_scores[i]
+                scores = sorted(scores, key=lambda sc: sc["cross_encoder_score"], reverse=True)[:limit]
+            case _:
+                print("invalid rerank method")
+    
     for i in range(len(scores)):
         score = scores[i]
         title = score["title"]
@@ -200,6 +275,15 @@ def rrf_search(docs, query, k, limit, enhance):
         sr = score["semantic_rank"]
         rrf = score["rrf_score"]
         print(f"{i + 1}. {title}")
+        if "rerank_score" in score:
+            rerank_score = score["rerank_score"]
+            print(f"Rerank Score: {rerank_score}/10")
+        if "rerank_rank" in score:
+            rerank_rank = score["rerank_rank"]
+            print(f"Rerank Rank: {rerank_rank}")
+        if "cross_encoder_score" in score:
+            cross_encoder_score = score["cross_encoder_score"]
+            print(f"Cross Encoder Score: {cross_encoder_score}")
         print(f"RRF Score: {rrf}")
         print(f"BM25 Rank: {bm25}, Semantic Rank: {sr}")
         print(desc)

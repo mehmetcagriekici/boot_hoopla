@@ -23,6 +23,7 @@ def main() -> None:
     weighted_search_parser = subparsers.add_parser("weighted-search", help="hybrid search")
     rrf_search_parser = subparsers.add_parser("rrf-search", help="reciprocal rank fusion search")
     
+
     # arguments
     normalize_parser.add_argument("scores", type=float, nargs="*", default=[], help="bm25 scores")
     weighted_search_parser.add_argument("query", type=str, help="search query")
@@ -36,7 +37,13 @@ def main() -> None:
         type=str,
         choices=["spell", "rewrite", "expand"],
         help="Query enhancement method",
-    ) 
+    )
+    rrf_search_parser.add_argument(
+        "--rerank-method",
+        type=str,
+        choices=["individual", "batch", "cross_encoder"],
+        help="reranking with llm"
+    )
 
     args = parser.parse_args()
 
@@ -49,7 +56,7 @@ def main() -> None:
         case "weighted-search":
             weighted_search(mvs, args.query, args.alpha, args.limit)
         case "rrf-search":
-            rrf_search(mvs, args.query, args.k, args.limit, args.enhance)
+            rrf_search(mvs, args.query, args.k, args.limit, args.enhance, args.rerank_method)
         case _:
             parser.print_help()
 
