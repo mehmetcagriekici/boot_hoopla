@@ -44,6 +44,7 @@ def main() -> None:
         choices=["individual", "batch", "cross_encoder"],
         help="reranking with llm"
     )
+    rrf_search_parser.add_argument("--evaluate", action="store_true", help="use an llm to evaluate results")
 
     args = parser.parse_args()
 
@@ -56,7 +57,7 @@ def main() -> None:
         case "weighted-search":
             weighted_search(mvs, args.query, args.alpha, args.limit)
         case "rrf-search":
-            rrf_search(mvs, args.query, args.k, args.limit, args.enhance, args.rerank_method)
+            rrf_search(mvs, args.query, args.k, args.limit, args.enhance, args.rerank_method, args.evaluate)
         case _:
             parser.print_help()
 

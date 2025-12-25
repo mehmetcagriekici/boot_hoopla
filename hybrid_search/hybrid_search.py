@@ -140,7 +140,7 @@ def weighted_search(docs, query, alpha, limit):
         print(f"BM25: {bm25:.4f}, Semantic: {ss:.4f}")
         print(desc)
 
-def rrf_search(docs, query, k, limit, enhance, rerank_method):
+def rrf_search(docs, query, k, limit, enhance, rerank_method, evaluate):
     search_query = query
     if enhance is not None:
         match enhance:
@@ -266,6 +266,31 @@ def rrf_search(docs, query, k, limit, enhance, rerank_method):
                 scores = sorted(scores, key=lambda sc: sc["cross_encoder_score"], reverse=True)[:limit]
             case _:
                 print("invalid rerank method")
+
+    if evaluate:
+        formatted_results = map(lambda sc: f"{sc['title']} - {sc['desc']}", scores)
+        prompt = f"""Rate how relevant each result is to this query on a 0-3 scale:
+
+        Query: "{query}"
+
+        Results:
+        {chr(10).join(formatted_results)}
+
+        Scale:
+        - 3: Highly relevant
+        - 2: Relevant
+        - 1: Marginally relevant
+        - 0: Not relevant
+
+        Do NOT give any numbers out than 0, 1, 2, or 3.
+
+        Return ONLY the scores in the same order you were given the documents. Return a valid JSON list, nothing else. For example:
+
+        [2, 0, 3, 2, 0, 1]"""
+        response = gemini(prompt)
+        evaluate_scores = re.sub(r"[^0-9]", " ", response).split()
+        for i in range(len(scores)):
+            scores[i]["evaluate"] = evaluate_scores[i]
     
     for i in range(len(scores)):
         score = scores[i]
@@ -274,7 +299,10 @@ def rrf_search(docs, query, k, limit, enhance, rerank_method):
         bm25 = score["bm25_rank"]
         sr = score["semantic_rank"]
         rrf = score["rrf_score"]
-        print(f"{i + 1}. {title}")
+        score_evaluate = ""
+        if "evaluate" in score:
+            score_evaluate = f"{score['evaluate']}/3"
+        print(f"{i + 1}. {title} {score_evaluate}")
         if "rerank_score" in score:
             rerank_score = score["rerank_score"]
             print(f"Rerank Score: {rerank_score}/10")
