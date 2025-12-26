@@ -6,9 +6,7 @@ sys.path.insert(0, str(project_root))
 import argparse
 
 from helpers.load import load_json
-from hybrid_search.hybrid_search import(
-    HybridSearch,
-)
+from hybrid_search.hybrid_search import HybridSearch
 
 def main():
     parser = argparse.ArgumentParser(description="Search Evaluation CLI")
